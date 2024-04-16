@@ -1,0 +1,214 @@
+Resources:
+  MyCodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Location: !Ref ArtifactBucket
+        Type: S3
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: '1'
+                Provider: CodeCommit
+              Configuration:
+                RepositoryName: RecursosRepo
+                BranchName: develop
+              OutputArtifacts:
+                - Name: SourceOutput
+        - Name: Build
+          Actions:
+            - Name: BuildAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: '1'
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+        - Name: Deploy
+          Actions:
+            - Name: DeployAction
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CodeDeploy
+              Configuration:
+                ApplicationName: !Ref CodeDeployApplication
+                DeploymentGroupName: !Ref CodeDeployDeploymentGroup
+              InputArtifacts:
+                - Name: BuildOutput
+
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodePipelinePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - codecommit:*
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - codebuild:*
+                Resource: '*'
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: MyCodeBuildProject
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:4.0
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: ENV_VAR_NAME
+            Type: PLAINTEXT
+            Value: ENV_VAR_VALUE
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                python: 3.8
+            build:
+              commands:
+                - echo "testando"
+                - aws --version
+                - echo "Build started on `date`"
+                - echo "Compiling the code..."
+                # Empacotar o template.yaml e fazer o deploy usando o CloudFormation CLI
+                - ls
+                - aws cloudformation package --template-file template.yaml --s3-bucket createpipe-artifactbucket-v9ccbizsaffj --output-template-file packaged-template.yaml
+                - aws cloudformation deploy --template-file packaged-template.yaml --stack-name my-stack --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND
+      Artifacts:
+        Type: CODEPIPELINE
+
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodeBuildPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStackSet
+                  - cloudformation:UpdateStackSet
+                  - cloudformation:*
+                  - logs:*
+                  - s3:*
+                  - kms:*
+                  - ec2:*
+                  - elasticloadbalancing:*
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - codecommit:*
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetBucketVersioning
+                  - s3:GetObject
+                Resource:
+                  - !GetAtt ArtifactBucket.Arn
+                  - !Sub "${ArtifactBucket.Arn}/*"
+
+
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: MyCodeDeployApplication
+
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      DeploymentGroupName: MyDeploymentGroup
+      DeploymentConfigName: CodeDeployDefault.AllAtOnce
+      ServiceRoleArn: !GetAtt CodeDeployRole.Arn
+
+  DeployAppSpecTemplate:
+    Type: AWS::CodeDeploy::DeploymentConfig
+    Properties:
+      DeploymentConfigName: MyAppSpecTemplate
+      MinimumHealthyHosts:
+        Type: FLEET_PERCENT
+        Value: 50
+
+  CodeDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codedeploy.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodeDeployPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                  - ec2:*
+                  - codedeploy:*
+                  - cloudformation:CreateStackSet
+                  - cloudformation:UpdateStackSet
+                  - cloudformation:Describe*
+                  - logs:*
+                  - kms:*
+                Resource: '*'
+        - PolicyName: CodeDeployS3Policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - s3:PutObject
+                  - s3:GetBucketVersioning
+                  - s3:GetObject
+                Resource:
+                  - "arn:aws:s3:::createpipe-artifactbucket-jdy9c2vhtduq/*"
+
+
