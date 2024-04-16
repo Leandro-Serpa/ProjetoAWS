@@ -60,3 +60,10 @@ Customização Adicional:
 Personalize o conteúdo da página HTML conforme necessário, editando o script UserData no template.
 Certifique-se de revisar as configurações de segurança, como as regras de ingresso do security group, para garantir a segurança da sua instância.
 Com esses passos, você deve ter uma instância EC2 configurada com Nginx e pronta para hospedar sua página web estática. Certifique-se de monitorar e gerenciar sua instância conforme necessário, e personalize conforme as necessidades específicas do seu projeto.
+
+# Mais
+
+Claro que foi feito de um forma com o CI/CD com serviço de repositório da AWS codecommit, mas poderia ser feito com o github, gitlab por exemplo.
+Além que poderia ser feito de outra forma, com uma regra do eventbridge e lambda, que ao ver alterações do repositório, trigasse a lambda para update da stack.
+Mais um ponto que poderia usar o github actions ou jenkins para pipeline.
+Foi utilizado o cloudformation como IaC, mas poderia também usar o terraform.
