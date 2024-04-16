@@ -64,6 +64,9 @@ Com esses passos, você deve ter uma instância EC2 configurada com Nginx e pron
 # Mais
 
 Claro que foi feito de um forma com o CI/CD com serviço de repositório da AWS codecommit, mas poderia ser feito com o github, gitlab por exemplo.
+
 Além que poderia ser feito de outra forma, com uma regra do eventbridge e lambda, que ao ver alterações do repositório, trigasse a lambda para update da stack.
+
 Mais um ponto que poderia usar o github actions ou jenkins para pipeline.
+
 Foi utilizado o cloudformation como IaC, mas poderia também usar o terraform.
